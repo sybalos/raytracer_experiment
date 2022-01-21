@@ -1,22 +1,26 @@
-import glm
 
-# Image
+from typeInfo import *
+
+from ray import Ray
 
 imageWidth = 256
 imageHeight = 256
-
 imageString = "P3\n{} {}\n255\n".format(imageWidth, imageHeight)
-for i in reversed(range(imageHeight-1)):
-    for j in range(imageWidth):
-        r = float(i) / (imageWidth-1)
-        g = float(j) / (imageHeight-1)
-        b = 0.25
 
-        ir = int(255.999 * r)
-        ig = int(255.999 * g)
-        ib = int(255.999 * b)
+def writeColor(outputString, color):
+    ir = int(255.999 * color.r)
+    ig = int(255.999 * color.g)
+    ib = int(255.999 * color.b)
+    outputString += "{} {} {} \n".format(ir,ig,ib)
+    return outputString
 
-        imageString += "{} {} {} \n".format(ir,ig,ib)
+for j in reversed(range(imageHeight-1)):
+    print("\rScanlines remaining: {} ", j)
+    for i in range(imageWidth):
+        color = Color(float(i) / (imageWidth - 1), float(j) / (imageHeight - 1), 0.25 )
+        imageString = writeColor(imageString, color)
+print("\nDone\n")
+
 
 file = open("result.ppm", "w")
 file.write(imageString)
