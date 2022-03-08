@@ -22,8 +22,8 @@ lowerLeftCorner = origin - horizontal/2 - vertical/2 - Vec3(0,0,focalLength)
 
 def hitSphere(center, radius, ray):
     oc = ray.origin - center
-    a = glm.dot(ray.direction, r.direction)
-    b = 2.0 * glm.dot(oc, r.direction)
+    a = glm.dot(ray.direction, ray.direction)
+    b = 2.0 * glm.dot(oc, ray.direction)
     c = glm.dot(oc,oc) - radius * radius
     discriminant = b*b - 4*a*c
     if discriminant < 0:
@@ -39,9 +39,9 @@ def writeColor(outputString, color):
     return outputString
 
 def rayColor(ray):
-    t = hitSphere(Point3(0,0,-1), 0.5, r)
+    t = hitSphere(Point3(0,0,-1), 0.5, ray)
     if t > 0.0:
-        N = Vec3(glm.normalize(r.at(t) - Vec3(0,0,-1)))
+        N = Vec3(glm.normalize(ray.at(t) - Vec3(0,0,-1)))
         return 0.5*Color(N.x + 1, N.y + 1, N.z + 1)
 
     unitDirection = glm.normalize(ray.direction)
@@ -59,7 +59,7 @@ for j in reversed(range(imageHeight-1)):
         imageString = writeColor(imageString, color)
 print("\nDone\n")
 
-rayColor(Ray(Color(0,0,0), Vec3(0,0,0)))
+#rayColor(Ray(Color(0,0,0), Vec3(0,0,0)))
 
 file = open("result.ppm", "w")
 file.write(imageString)
