@@ -1,11 +1,15 @@
+from fileinput import close
+from tkinter import CENTER
 from typeInfo import *
 from ray import Ray
+from vector import *
 
 # Image
 
 aspectRatio = 16.0 / 9.0
 imageWidth = 400
 imageHeight = int(imageWidth / aspectRatio)
+
 
 # Camera
 
@@ -20,16 +24,83 @@ lowerLeftCorner = origin - horizontal/2 - vertical/2 - Vec3(0,0,focalLength)
 
 # Render
 
+class hitRecord:
+    def __init__(self):
+        self.p = Point3()
+        self.normal = Vec3()
+        self.t = 0
+        self.frontFace = False
+
+    def setFaceNormal(self, ray, outwardNormal):
+        self.frontFace = glm.dot(ray.direction, outwardNormal) < 0
+        self.normal = outwardNormal if self.frontFace else -outwardNormal
+
+class Sphere:
+    def __init__(self, center, radius):
+        self.center = center
+        self.radius = radius
+    
+    def hit(self, ray, tMin, tMax):
+        oc = ray.origin - self.center
+        a = lenSquared(ray.direction)
+        half_b = glm.dot(oc, ray.direction)
+        c = lenSquared(oc) - self.radius * self.radius
+
+        discriminant = half_b * half_b - a*c
+        if discriminant < 0: return False,None
+        sqrtd = glm.sqrt(discriminant)
+
+        root = (-half_b - sqrtd) / a
+        if root < tMin or tMax < root:
+            root = (-half_b + sqrtd) / a
+            if root < tMin or tMax < root:
+                return False, None
+
+        record = hitRecord()
+        record.t = root
+        record.p = ray.at(record.t)
+        outwardNormal = (record.p - self.center) / self.radius
+        record.setFaceNormal(ray, outwardNormal)
+
+        return True, record
+
+class HittableList:
+    def __init__(self):
+        self.objects = []
+
+    def hit(self, ray, tMin, tMax):
+        hitRec = None
+        hitAnything = False
+        closest = tMax
+
+        for object in self.objects:
+            hitResult = object.hit(ray, tMin, closest) 
+            if hitResult[0]:
+                hitAnything = True
+                closest = hitResult[1].t
+                hitRec = hitResult[1]
+        
+        return hitAnything, hitRec
+
+# World
+world = HittableList()
+sphere1 = Sphere(Point3(0,0,-1), 0.5)
+sphere2 = Sphere(Point3(0,-100.5,-1), 100)
+world.objects.append(sphere1)
+world.objects.append(sphere2)
+
 def hitSphere(center, radius, ray):
     oc = ray.origin - center
-    a = glm.dot(ray.direction, ray.direction)
-    b = 2.0 * glm.dot(oc, ray.direction)
-    c = glm.dot(oc,oc) - radius * radius
-    discriminant = b*b - 4*a*c
+    a = lenSquared(ray.direction)
+    half_b = glm.dot(oc, ray.direction)
+    c = lenSquared(oc) - radius*radius
+    
+    discriminant = half_b*half_b - a*c
+
     if discriminant < 0:
         return -1.0
     else:
-        return (-b - glm.sqrt(discriminant)) / (2.0*a)
+        return (-half_b - glm.sqrt(discriminant)) / a
 
 def writeColor(outputString, color):
     ir = int(255.999 * color.r)
@@ -38,11 +109,10 @@ def writeColor(outputString, color):
     outputString += "{} {} {} \n".format(ir,ig,ib)
     return outputString
 
-def rayColor(ray):
-    t = hitSphere(Point3(0,0,-1), 0.5, ray)
-    if t > 0.0:
-        N = Vec3(glm.normalize(ray.at(t) - Vec3(0,0,-1)))
-        return 0.5*Color(N.x + 1, N.y + 1, N.z + 1)
+def rayColor(ray, _world):
+    hitResult = _world.hit(ray, 0, float('inf'))
+    if hitResult[0]:
+        return 0.5 * (hitResult[1].normal + Color(1,1,1))
 
     unitDirection = glm.normalize(ray.direction)
     t = 0.5 * (unitDirection.y + 1.0)
@@ -55,11 +125,9 @@ for j in reversed(range(imageHeight-1)):
         u = float(i) / (imageWidth - 1)
         v = float(j) / (imageHeight - 1)
         r = Ray(origin, lowerLeftCorner + u * horizontal + v*vertical - origin)
-        color = rayColor(r)
+        color = rayColor(r,world)
         imageString = writeColor(imageString, color)
 print("\nDone\n")
-
-#rayColor(Ray(Color(0,0,0), Vec3(0,0,0)))
 
 file = open("result.ppm", "w")
 file.write(imageString)
