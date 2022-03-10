@@ -1,4 +1,5 @@
 from fileinput import close
+from random import random, sample
 from tkinter import CENTER
 from typeInfo import *
 from ray import Ray
@@ -9,22 +10,34 @@ from vector import *
 aspectRatio = 16.0 / 9.0
 imageWidth = 400
 imageHeight = int(imageWidth / aspectRatio)
+samplePerPixel = 100
 
 
 # Camera
+class Camera:
+    def __init__(self):
+        self.aspectRatio = 16.0 / 9.0
+        self.viewportHeight = 2.0
+        self.viewportWidth = self.aspectRatio * self.viewportHeight
+        self.focalLength = 1.0
 
-viewportHeight = 2.0
-viewportWidth = aspectRatio * viewportHeight
-focalLength = 1.0
+        self.origin = Point3(0,0,0)
+        self.horizontal = Vec3(self.viewportWidth,0,0)
+        self.vertical = Vec3(0,self.viewportHeight,0)
+        self.lowerLeftCorner = self.origin - self.horizontal/2 - self.vertical/2 - Vec3(0,0,self.focalLength)
+    
+    def getRay(self, u,v):
+        return Ray(self.origin, self.lowerLeftCorner + u*self.horizontal + v*self.vertical - self.origin)
 
-origin = Point3(0,0,0)
-horizontal = Vec3(viewportWidth, 0, 0)
-vertical = Vec3(0,viewportHeight, 0)
-lowerLeftCorner = origin - horizontal/2 - vertical/2 - Vec3(0,0,focalLength)
 
+camera = Camera()
+
+# Utils
+def randomRange(min,max):
+    return min + (max-min) * random.random()
 # Render
 
-class hitRecord:
+class HitRecord:
     def __init__(self):
         self.p = Point3()
         self.normal = Vec3()
@@ -56,7 +69,7 @@ class Sphere:
             if root < tMin or tMax < root:
                 return False, None
 
-        record = hitRecord()
+        record = HitRecord()
         record.t = root
         record.p = ray.at(record.t)
         outwardNormal = (record.p - self.center) / self.radius
@@ -109,6 +122,25 @@ def writeColor(outputString, color):
     outputString += "{} {} {} \n".format(ir,ig,ib)
     return outputString
 
+def writeColorScaled(outputString, color, samplePerPixel):
+    r = color.r
+    g = color.g
+    b = color.b
+    
+    #Divide color by the number of samples
+    scale = 1.0 / samplePerPixel
+    r *= scale
+    g *= scale
+    b *= scale
+
+    # Write the translated [0,255] of each component
+    ir = int(256 * glm.clamp(r,0.0,0.999))
+    ig = int(256 * glm.clamp(g,0.0,0.999))
+    ib = int(256 * glm.clamp(b,0.0,0.999))
+    outputString += "{} {} {} \n".format(ir,ig,ib)
+    return outputString
+
+
 def rayColor(ray, _world):
     hitResult = _world.hit(ray, 0, float('inf'))
     if hitResult[0]:
@@ -122,11 +154,13 @@ imageString = "P3\n{} {}\n255\n".format(imageWidth, imageHeight)
 for j in reversed(range(imageHeight-1)):
     print("\rScanlines remaining: {} ", j)
     for i in range(imageWidth):
-        u = float(i) / (imageWidth - 1)
-        v = float(j) / (imageHeight - 1)
-        r = Ray(origin, lowerLeftCorner + u * horizontal + v*vertical - origin)
-        color = rayColor(r,world)
-        imageString = writeColor(imageString, color)
+        pixelColor = Color(0,0,0)
+        for s in range(samplePerPixel):
+            u = (i + random()) / (imageWidth - 1)
+            v = (j + random()) / (imageHeight - 1)
+            ray = camera.getRay(u,v)
+            pixelColor += rayColor(ray,world)
+        imageString = writeColorScaled(imageString, pixelColor, samplePerPixel)
 print("\nDone\n")
 
 file = open("result.ppm", "w")
